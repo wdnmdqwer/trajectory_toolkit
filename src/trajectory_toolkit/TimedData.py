@@ -17,19 +17,19 @@ class TimedData:
     last = 0
     timeID = 0
     labeling = {}
-    
+
     def __init__(self, Nc = 1):
-        self.Nc = Nc; 
+        self.Nc = Nc;
         self.last = -1;
         self.d = np.empty([10,Nc]);
         self.labeling = {}
-    
+
     def clearLabeling(self):
         self.labeling = {}
-        
+
     def addLabeling(self,label,colIDs):
         self.labeling[label] = colIDs
-        
+
     def addLabelingIncremental(self,newLabel,numCol,n = 1):
         if(n == 1):
             self.addLabeling(newLabel,range(self.Nc,self.Nc+numCol))
@@ -39,7 +39,7 @@ class TimedData:
                 colIDs.append(range(self.Nc+numCol*i,self.Nc+numCol*(i+1)))
             self.addLabeling(newLabel,colIDs)
         self.Nc = self.Nc + numCol*n
-    
+
     def getColIDs(self,col):
         if(isinstance(col, basestring)):
             if self.labeling.has_key(col):
@@ -48,28 +48,28 @@ class TimedData:
                 print('WARNING: no such column as ' + col + '!')
                 return None
         return col
-        
+
     def reInit(self):
         self.last = -1
         self.d = np.empty([10,self.Nc])
-    
+
     def initEmptyFromTimes(self, times): #TESTED
         self.last = np.shape(times)[0]-1
         self.d = np.zeros([np.shape(times)[0], self.Nc])
         self.d[:self.end(),self.timeID] = times;
-    
+
     def cropTimes(self, t0, t1):
         indices, = np.nonzero(np.logical_and(self.getTime() >= t0,self.getTime() <= t1))
         self.d = np.take(self.D(), indices, axis=0)
         self.last = np.size(indices)-1
-    
+
     def setColumnToSine(self, col, amplitude, frequency, phaseShift):
         colID = self.getColIDs(col)
         if(Utils.getLen(colID) > 1):
             print('WARNING: setColumnToSine only implement for single column!')
         else:
             self.setCol(amplitude * np.sin(2 * np.pi * frequency * self.getTime() + phaseShift), colID)
-    
+
     def setCol(self, data, col): #TESTED
         colIDs = self.getColIDs(col)
         if(np.shape(data)[0] == self.end()):
@@ -79,7 +79,7 @@ class TimedData:
                 print('WARNING: Did not set columns! No column with that ID!')
         else:
             print('WARNING: Did not set columns! Wrong data size!');
-    
+
     def setRow(self, data, rowIDs): #TESTED
         if(np.shape(data)[0] == self.Nc):
             if(np.all(np.less(rowIDs, self.end()))):
@@ -88,28 +88,28 @@ class TimedData:
                 print('WARNING: Did not set row! No row with that ID!')
         else:
             print('WARNING: Did not set row! Wrong data size!');
-            
+
     def setBlock(self, data, rowID, col):
         colIDs = self.getColIDs(col)
         if(np.shape(data)[0] <= (self.end()-rowID) ):
-            if(np.shape(data)[1] <= (self.Nc-colIDs) ): 
+            if(np.shape(data)[1] <= (self.Nc-colIDs) ):
                 self.d[rowID:rowID+np.shape(data)[0],colIDs:colIDs+np.shape(data)[1]] = data;
             else:
                 print('WARNING: Did not set block! Columns exceed matrix size!')
         else:
             print('WARNING: Did not set block! Rows exceed matrix size!');
-    
+
     # These getter are used to access the "meaningful" data
     def D(self): #TESTED
         return self.d[:self.end(),];
-    
+
     def col(self, col): #TESTED
         colIDs = self.getColIDs(col)
         # Check colIDs validity
         if(np.any(np.greater(colIDs, np.shape(self.d)[1]-1))):
             print('WARNING: You requested an invalid colIDs. Returning Zeros!');
             print(colIDs)
-            return np.zeros([self.end(), Utils.getLen(colIDs)]); 
+            return np.zeros([self.end(), Utils.getLen(colIDs)]);
         # Return data
         return self.d[0:self.end(), colIDs];
 
@@ -118,19 +118,19 @@ class TimedData:
         if(np.any(np.greater(rowIDs, self.last))):
             print('WARNING: You requested an invalid rowID. Returning Zeros!');
             print(rowIDs)
-            return np.zeros([Utils.getLen(rowIDs), self.Nc]); 
+            return np.zeros([Utils.getLen(rowIDs), self.Nc]);
         # Return data
-        return self.d[rowIDs,:];     
-   
+        return self.d[rowIDs,:];
+
     def getTime(self):
         return self.col(self.timeID)
-   
+
     def getLastTime(self):
         return self.col(self.timeID)[-1]
-    
+
     def getFirstTime(self):
         return self.col(self.timeID)[0]
-    
+
     def getSubTimedData(self,col = None,rowIDs = None):
         if(col == None):
             col = range(1,self.Nc)
@@ -140,19 +140,19 @@ class TimedData:
         newTD = TimedData(Utils.getLen(colIDs))
         newTD.initEmptyFromTimes(self.d[rowIDs,0])
         newTD.setCol(self.d[rowIDs,colIDs], range(Utils.getLen(colIDs)))
-   
+
     # Append an entry, resize array
     def append(self): #TESTED
         if np.shape(self.d)[0] == self.end():
-            self.d = np.resize(self.d, (2*np.shape(self.d)[0], self.Nc));   
+            self.d = np.resize(self.d, (2*np.shape(self.d)[0], self.Nc));
         self.last += 1;
 
     def end(self): #TESTED
         return (self.last + 1);
-    
+
     def length(self): #TESTED
         return (self.last + 1);
-    
+
     # Math functions
     def computeNormOfColumns(self, col, normID):
         colIDs = self.getColIDs(col)
@@ -170,14 +170,14 @@ class TimedData:
                 self.d[a:self.end()-b,colOutIDs[i]] = np.divide(dp,dt);
         else:
             print('WARNING: Compute N derivative failed! ColIDs did not match in size.')
-    
+
     def computeVelocitiesInBodyFrameFromPostionInWorldFrame(self, colPos, colVel, colAtt, a=1, b=0):
         colPosIDs = self.getColIDs(colPos)
         colVelIDs = self.getColIDs(colVel)
         colAttIDs = self.getColIDs(colAtt)
         self.computeVectorNDerivative(colPosIDs, colVelIDs, a, b)
         self.setCol(Quaternion.q_rotate(self.col(colAttIDs), self.col(colVelIDs)),colVelIDs);
-    
+
     def computeRotationalRateFromAttitude(self, colAtt, colRor, a=1, b=0):
         colAttIDs = self.getColIDs(colAtt)
         colRorIDs = self.getColIDs(colRor)
@@ -187,7 +187,7 @@ class TimedData:
             self.d[0:a,colRorIDs[i]].fill(0)
             self.d[self.end()-b:self.end(),colRorIDs[i]].fill(0)
             self.d[a:self.end()-b,colRorIDs[i]] = np.divide(dv[:,i],dt);
-    
+
     def computeRatesFromPose(self, colPos, colAtt, colVel, colRor, a=1, b=0):
         colPosIDs = self.getColIDs(colPos)
         colAttIDs = self.getColIDs(colAtt)
@@ -195,14 +195,14 @@ class TimedData:
         colRorIDs = self.getColIDs(colRor)
         self.computeVelocitiesInBodyFrameFromPostionInWorldFrame(colPosIDs,colVelIDs,colAttIDs,a,b)
         self.computeRotationalRateFromAttitude(colAttIDs,colRorIDs,a,b)
-        
+
     def transformRatesFromWorldToBody(self, colAtt, colVel, colRor):
         colAttIDs = self.getColIDs(colAtt)
         colVelIDs = self.getColIDs(colVel)
         colRorIDs = self.getColIDs(colRor)
         self.setCol(Quaternion.q_rotate(self.col(colAttIDs), self.col(colRorIDs)),colRorIDs)
         self.setCol(Quaternion.q_rotate(self.col(colAttIDs), self.col(colVelIDs)),colVelIDs)
-        
+
     def interpolateColumns(self, other, colIn, colOut=None): #TESTED
         # Allow interpolating in to other columns / default is into same column
         if colOut is None:
@@ -222,7 +222,7 @@ class TimedData:
                 print('WARNING: Interpolation failed! Time values must be increasing.')
         else:
             print('WARNING: Interpolation failed! ColIDs did not match in size.')
-    
+
     def interpolateQuaternion(self, other, colIn, colOut=None):
         # All quaternions before self start are set to the first entry
         if colOut is None:
@@ -234,7 +234,7 @@ class TimedData:
         while other.getTime()[counterOut] <= self.getTime()[counter]:
             other.d[counterOut,colOutIDs] = self.d[counter,colInIDs]
             counterOut += 1
-            
+
         # Interpolation
         while(counterOut < other.length()):
             while(self.getTime()[counter] < other.getTime()[counterOut] and counter < self.last):
@@ -242,12 +242,12 @@ class TimedData:
             counter
             if (counter != self.last):
                 d = (other.getTime()[counterOut]-self.getTime()[counter-1])/(self.getTime()[counter]-self.getTime()[counter-1]);
-                other.d[counterOut,colOutIDs] = Quaternion.q_slerp(self.d[counter-1,colInIDs], self.d[counter,colInIDs], d)   
+                other.d[counterOut,colOutIDs] = Quaternion.q_slerp(self.d[counter-1,colInIDs], self.d[counter,colInIDs], d)
             else:
                 # Set quaternion equal to last quaternion constant extrapolation
                 other.d[counterOut,colOutIDs] = self.d[counter,colInIDs];
             counterOut +=1
-        
+
     def getTimeOffset(self,colIn, other, colOut=None):
         if colOut is None:
             colOut = colIn
@@ -275,7 +275,7 @@ class TimedData:
         if paddingWithRMS:
             RMS = np.sqrt(np.mean(np.square(self.col(1))))
             td1.setBlock(np.ones([NIn-1,1])*RMS,0,1)
-            td1.setBlock(np.ones([NIn-1,1])*RMS,N+(NIn-1),1)        
+            td1.setBlock(np.ones([NIn-1,1])*RMS,N+(NIn-1),1)
         # Calc COnvolution
         if paddingWithRMS:
             conv = np.correlate(td1.D()[:,1], td2.D()[:,1], 'valid')
@@ -284,19 +284,19 @@ class TimedData:
         if weightingWithOverlapLength:
             w = np.minimum(np.minimum(np.arange(1,N+NIn,1),np.ones(N+NIn-1)*NIn),np.arange(N+NIn-1,0,-1))
             conv = conv / w
-        # Deviation of the maximum convolution from the middle of the convolution vector  
+        # Deviation of the maximum convolution from the middle of the convolution vector
         n = np.argmax(conv) - NIn + 1
         return timeIncrement*n + self.getFirstTime() - other.getFirstTime()
-    
+
     def applyTimeOffset(self,to):
         self.setCol(self.col(0) + to,0)
-        
+
     def applyBodyTransform(self, pos, att, translation, rotation):
         posID = self.getColIDs(pos)
         attID = self.getColIDs(att)
-        if translation == None:
+        if translation is None:
             translation = np.array([0.0, 0.0, 0.0])
-        if rotation == None:
+        if rotation is None:
             rotation = np.array([1.0, 0, 0, 0])
         newTranslation = self.col(posID) \
                          + Quaternion.q_rotate(Quaternion.q_inverse(self.col(attID)),
@@ -307,7 +307,7 @@ class TimedData:
             self.setCol(newTranslation[:,i],posID[i])
         for i in np.arange(0,4):
             self.setCol(newRotation[:,i],attID[i])
-    
+
     def applyBodyTransformToTwist(self, vel, ror, translation, rotation):
         velID = self.getColIDs(vel)
         rorID = self.getColIDs(ror)
@@ -319,11 +319,11 @@ class TimedData:
         for i in np.arange(0,3):
             self.setCol(newVel[:,i],velID[i])
             self.setCol(newRor[:,i],rorID[i])
-    
+
     def applyBodyTransformFull(self, pos, att, vel, ror, translation, rotation):
         self.applyBodyTransform(pos, att, translation, rotation)
         self.applyBodyTransformToTwist(vel, ror, translation, rotation)
-        
+
     def applyInertialTransform(self, pos, att, translation, rotation):
         posID = self.getColIDs(pos)
         attID = self.getColIDs(att)
@@ -336,13 +336,13 @@ class TimedData:
             self.setCol(newTranslation[:,i],posID[i])
         for i in np.arange(0,4):
             self.setCol(newRotation[:,i],attID[i])
-        
+
     def invertRotation(self, att):
         attID = self.getColIDs(att)
         newRotation = Quaternion.q_inverse(self.col(attID))
         for i in np.arange(0,4):
             self.setCol(newRotation[:,i],attID[i])
-        
+
     def invertTransform(self, pos, att):
         posID = self.getColIDs(pos)
         attID = self.getColIDs(att)
@@ -350,7 +350,7 @@ class TimedData:
         for i in np.arange(0,3):
             self.setCol(newTranslation[:,i],posID[i])
         self.invertRotation(attID)
-    
+
     def calibrateBodyTransform(self, vel1, ror1, other, vel2, ror2):
         velID1 = self.getColIDs(vel1)
         rorID1 = self.getColIDs(ror1)
@@ -381,7 +381,7 @@ class TimedData:
             AA += A.T.dot(A)
         w, v = np.linalg.eigh(AA)
         rotation = v[:,0]
-        
+
         # Find transformation
         A = np.zeros([3*td1.length(),3])
         b = np.zeros([3*td1.length()])
@@ -389,15 +389,15 @@ class TimedData:
             A[3*i:3*i+3,] = np.resize(Utils.skew(td1.D()[i,4:7]),(3,3))
             b[3*i:3*i+3] = Quaternion.q_rotate(Quaternion.q_inverse(rotation), td2.D()[i,1:4])-td1.D()[i,1:4]
         translation = np.linalg.lstsq(A, b)[0]
-        
+
         return translation, rotation
-        
-    def calibrateInertialTransform(self, pos1, att1, other, pos2, att2, B_r_BC, q_CB, calIDs=[0]):      
+
+    def calibrateInertialTransform(self, pos1, att1, other, pos2, att2, B_r_BC, q_CB, calIDs=[0]):
         posID1 = self.getColIDs(pos1)
         attID1 = self.getColIDs(att1)
         posID2 = other.getColIDs(pos2)
         attID2 = other.getColIDs(att2)
-        # Make timing calculation 
+        # Make timing calculation
         dt1 = self.getLastTime()-self.getFirstTime()
         dt2 = other.getLastTime()-other.getFirstTime()
         first = max(self.getFirstTime(),other.getFirstTime())
@@ -411,7 +411,7 @@ class TimedData:
         other.interpolateColumns(td2, posID2, [1,2,3])
         self.interpolateQuaternion(td1, attID1, [4,5,6,7])
         other.interpolateQuaternion(td2, attID2, [4,5,6,7])
-        
+
         if(not calIDs):
             calIDs = range(td1.length())
         newIDs = np.arange(0,Utils.getLen(calIDs))
@@ -422,12 +422,12 @@ class TimedData:
         J_r_JC = td2.D()[newIDs,1:4];
         J_r_BC = Quaternion.q_rotate(Quaternion.q_mult(q_JC_vec,q_CB_vec), B_r_BC_vec)
         J_r_IB = Quaternion.q_rotate(Quaternion.q_mult(q_JC_vec,Quaternion.q_mult(q_CB_vec,q_BI_vec)),td1.D()[newIDs,1:4])
-        
+
         rotation = Quaternion.q_mean(Quaternion.q_inverse(Quaternion.q_mult(Quaternion.q_mult(q_JC_vec,q_CB_vec),q_BI_vec)))
         translation = np.mean(J_r_JC-J_r_BC-J_r_IB, axis=0)
         return translation.flatten(), rotation.flatten()
-    
-    def computeSigmaBounds(self, data, cov, plus, minus, factor):   
+
+    def computeSigmaBounds(self, data, cov, plus, minus, factor):
         dataID = self.getColIDs(data)
         covID = self.getColIDs(cov)
         plusID = self.getColIDs(plus)
@@ -445,12 +445,12 @@ class TimedData:
         for i in range(0,Utils.getLen(dataID)):
             self.setCol(self.col(dataID[i])+factor*self.col(covDiag[i])**(1./2),plusID[i])
             self.setCol(self.col(dataID[i])-factor*self.col(covDiag[i])**(1./2),minusID[i])
-            
+
     def quaternionToYpr(self, att, ypr):
         attIDs = self.getColIDs(att)
         yprIDs = self.getColIDs(ypr)
         self.d[0:self.end(),yprIDs] = Quaternion.q_toYpr(self.col(attIDs))
-            
+
     def quaternionToYprCov(self, att, attCov, yprCov):
         attIDs = self.getColIDs(att)
         attCovIDs = self.getColIDs(attCov)
@@ -459,18 +459,18 @@ class TimedData:
         # Do the multiplication by hand, improve if possible
         for i in xrange(0,self.length()):
             self.d[i,yprCovIDs] = np.resize(np.dot(np.dot(np.resize(J[i,:],(3,3)),np.resize(self.col(attCovIDs)[i,:],(3,3))),np.resize(J[i,:],(3,3)).T),(9))
-    
+
     def quaternionToYprFull(self, att, attCov, ypr, yprCov):
         self.quaternionToYpr(att, ypr)
         self.quaternionToYprCov(att, attCov, yprCov)
-            
+
     def applyBodyTransformToAttCov(self, attCov, rotation):
         attCovIDs = self.getColIDs(attCov)
         R = np.resize(Quaternion.q_toRotMat(rotation),(3,3))
         # Do the multiplication by hand, improve if possible
         for i in xrange(0,self.length()):
             self.d[i,attCovIDs] = np.resize(np.dot(np.dot(R,np.resize(self.d[i,attCovIDs],(3,3))),R.T),(9))
-            
+
     def applyRotationToCov(self, cov, att, doInverse=False):
         covIDs = self.getColIDs(cov)
         attIDs = self.getColIDs(att)
@@ -481,7 +481,7 @@ class TimedData:
                 self.d[i,covIDs] = np.resize(np.dot(np.dot(R.T,np.resize(self.d[i,covIDs],(3,3))),R),(9))
             else:
                 self.d[i,covIDs] = np.resize(np.dot(np.dot(R,np.resize(self.d[i,covIDs],(3,3))),R.T),(9))
-    
+
     def computeLeutiScore(self, pos1, att1, vel1, other, pos2, att2, distances, spacings, start):
         posID1 = self.getColIDs(pos1)
         attID1 = self.getColIDs(att1)
@@ -494,7 +494,7 @@ class TimedData:
         outputYawFull = []
         outputInclFull = []
         startIndex = np.nonzero(self.getTime() >= start)[0][0]
-        
+
         for j in np.arange(Utils.getLen(distances)):
             tracks = [[startIndex, 0.0]]
             lastAddedStart = 0.0
@@ -502,12 +502,12 @@ class TimedData:
             attErrors = []
             yawErrors = []
             inclErrors = []
-        
+
             other_interp = TimedData(8)
             other_interp.initEmptyFromTimes(self.getTime())
             other.interpolateColumns(other_interp, posID2, [1,2,3])
             other.interpolateQuaternion(other_interp, attID2, [4,5,6,7])
-            
+
             it = startIndex
             while it+1<self.last:
                 # Check for new seeds
@@ -534,7 +534,7 @@ class TimedData:
                     inclErrors.append(np.asscalar(np.sum((Quaternion.q_boxMinus(att1,att2_cor))**2,axis=-1)))
                     tracks.pop(0)
                 it += 1
-            
+
             N = Utils.getLen(posErrors)
             posErrorRMS = (np.sum(posErrors,axis=-1)/N)**(0.5)
             posErrorMedian = np.median(posErrors)**(0.5)
@@ -559,15 +559,15 @@ class TimedData:
             outputYawFull.append(np.array(yawErrors)**(0.5))
             outputInclFull.append(np.array(inclErrors)**(0.5))
         return outputPosFull, outputAttFull, outputYawFull, outputInclFull
-    
+
     def pickleDump(self, filename):
         f = open(filename, 'wb')
         pickle.dump(self, f)
-    
+
     def pickleLoad(self, filename):
         f = open(filename, 'rb')
         self = pickle.load(f)
-    
+
     def writeColsToSingleFiles(self, folder, name, cols, separator = ',', f = '{0:05d}'):
         Utils.createFolderIfMissing(folder)
         extractedCols = self.col(cols)
@@ -578,6 +578,6 @@ class TimedData:
                 data = data + separator + str(extractedCols[i,j])
             with open(fileOut, 'w') as infoFile:
                 infoFile.write(data)
-            
+
 
 
