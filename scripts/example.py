@@ -12,7 +12,9 @@ from trajectory_toolkit import Utils
 from trajectory_toolkit import RosDataAcquisition
 
 rospack = rospkg.RosPack()
-data_path = os.path.join(rospack.get_path('trajectory_toolkit'), 'data')
+# print rospack.get_path('trajectory_toolkit')
+# data_path = os.path.join(rospack.get_path('trajectory_toolkit'), 'data')
+data_path = "/home/zsk/trajectory_toolkit/data"
 
 """
  	README:
@@ -30,13 +32,13 @@ data_path = os.path.join(rospack.get_path('trajectory_toolkit'), 'data')
 isNode = False;
 
 if isNode is not True:
-	""" Initialize Plotters 
+	""" Initialize Plotters
 	plotter1: figureID=1, three subplots
 	"""
 	plotter1 = Plotter(1, [3,1])
 
-	
-	""" Initialize TimedData 
+
+	""" Initialize TimedData
 		td1: TimedData with 18 columns: 0:t, 1-3:pos, 4-7:att, 8-10:vel,  11-13:velInBodyFrame, 14-16:ror, 17:rorNorm
 		td2: TimedData with 18 columns: 0:t, 1-4:att, 5-7:ror, 8:rorNorm, 9-11:pos, 12-14:vel, 15-17:velInBodyFrame
 	"""
@@ -54,7 +56,7 @@ if isNode is not True:
 	rorIDs2 = [5,6,7]
 	rorNID1 = 17
 	rorNID2 = 8
-	
+
 	"""
 		First we will fill the two TimedData structures with the same StampedTransforms,
 		loaded from topic 'rovio/transform' in example.bag.
@@ -62,12 +64,12 @@ if isNode is not True:
 	"""
 	RosDataAcquisition.rosBagLoadTransformStamped(os.path.join(data_path, 'example.bag'), '/rovio/transform',td1,posIDs1,attIDs1)
 	RosDataAcquisition.rosBagLoadTransformStamped(os.path.join(data_path, 'example.bag'), '/rovio/transform',td2,posIDs2,attIDs2)
-	
+
 	# Add initial x to plot
 	plotter1.addDataToSubplot(td1, posIDs1[0], 1, 'r', 'td1In x');
 	plotter1.addDataToSubplot(td2, posIDs2[0], 1, 'b', 'td2In x');
 
-	
+
 	"""
 		Apply body transform to the second data set. The column start IDs of position(9) and attitutde(1) have to be provided.
 		We define the rotation through a rotation vector vCB, the exponential represents the corresponding rotation quaternion qCB.
@@ -80,7 +82,7 @@ if isNode is not True:
 	print('Applying Body Transform:')
 	print('Rotation Vector ln(qCB):\tvx:' + str(vCB[0]) + '\tvy:' + str(vCB[1]) + '\tvz:' + str(vCB[2]))
 	print('Translation Vector B_r_BC:\trx:' + str(B_r_BC[0]) + '\try:' + str(B_r_BC[1]) + '\trz:' + str(B_r_BC[2]))
-	
+
 	"""
 		Apply inertial transform to the second data set. Same procedure as with the body transform.
 	"""
@@ -91,7 +93,7 @@ if isNode is not True:
 	print('Applying Inertial Transform:')
 	print('Rotation Vector ln(qIJ):\tvx:' + str(vIJ[0]) + '\tvy:' + str(vIJ[1]) + '\tvz:' + str(vIJ[2]))
 	print('Translation Vector J_r_JI:\trx:' + str(J_r_JI[0]) + '\try:' + str(J_r_JI[1]) + '\trz:' + str(J_r_JI[2]))
-	
+
 	"""
 		Apply time delay to the second data set.
 	"""
@@ -99,11 +101,11 @@ if isNode is not True:
 	td2.applyTimeOffset(timeOffset)
 	print('Applying Time Offset:')
 	print('Time Offset: ' + str(timeOffset) + 's')
-	
+
 	# Add transformed x to plot
 	plotter1.addDataToSubplot(td1, posIDs1[0], 2, 'r', 'td1In x');
 	plotter1.addDataToSubplot(td2, posIDs2[0], 2, 'b', 'td2Trans x');
-	
+
 	"""
 		Now we are ready to calculate the other TimedData properties.
 	"""
@@ -120,14 +122,14 @@ if isNode is not True:
 	# Calculate the Norm of the Rotational Rate provide ror(td1=[14,15,16], td2=[5,6,7]) and rorNorm(td1=17,td2=8) column IDs.
 	td1.computeNormOfColumns(rorIDs1,rorNID1)
 	td2.computeNormOfColumns(rorIDs2,rorNID2)
-	
+
 	"""
 		We can estimate the time offset using the norm of the rotational rate.
 		The estimated time offset is then applied to td2.
 	"""
 	to = td2.getTimeOffset(rorNID2,td1,rorNID1)
 	td2.applyTimeOffset(-to)
-	
+
 	"""
 		The calibration of the Body Transform needs the velocity and the rotational rate start IDs.
 	"""
@@ -140,7 +142,7 @@ if isNode is not True:
 	print('Translation Vector B_r_BC_est:\trx:' + str(B_r_BC_est[0]) + '\try:' + str(B_r_BC_est[1]) + '\trz:' + str(B_r_BC_est[2]))
 	print('Rotation Error ln(qCB_err):\tvx:' + str(vCB_err[0]) + '\tvy:' + str(vCB_err[1]) + '\tvz:' + str(vCB_err[2]))
 	print('Translation Error B_r_BC_err:\trx:' + str(B_r_BC_err[0]) + '\try:' + str(B_r_BC_err[1]) + '\trz:' + str(B_r_BC_err[2]))
-	
+
 	"""
 		The calibration of the Intertial Transform needs the velocity and the rotational rate start IDs and the estimated body transform.
 	"""
@@ -153,8 +155,8 @@ if isNode is not True:
 	print('Translation Vector J_r_JI_est:\trx:' + str(J_r_JI_est[0]) + '\try:' + str(J_r_JI_est[1]) + '\trz:' + str(J_r_JI_est[2]))
 	print('Rotation Error ln(qIJ_err):\tvx:' + str(vIJ_err[0]) + '\tvy:' + str(vIJ_err[1]) + '\tvz:' + str(vIJ_err[2]))
 	print('Translation Error J_r_JI_err:\trx:' + str(J_r_JI_err[0]) + '\try:' + str(J_r_JI_err[1]) + '\trz:' + str(J_r_JI_err[2]))
-	
-	
+
+
 	# Add calibrated x to plot
 	td1.applyBodyTransform(posIDs1, attIDs1, B_r_BC_est, qCB_est)
 	td1.applyInertialTransform(posIDs1, attIDs1,J_r_JI_est,qIJ_est)
@@ -180,7 +182,7 @@ else:
 	rospy.init_node('example', anonymous=True)
 	rate = rospy.Rate(100)
 	tsl = TransformStampedListener(td3, "/rovio/transform", 1, 4)
-	
+
 	"""
 		Initialize the plotter as a live plot. Limit the maximal number of displayed points to 300.
 	"""

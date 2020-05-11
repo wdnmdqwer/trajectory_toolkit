@@ -93,7 +93,7 @@ class VIEvaluator:
             td.addLabelingIncremental('feaDisCov',1,self.doNFeatures)
         td.reInit()
         self.td = td
-    
+
     def initTimedDataGT(self,td):
         td.clearLabeling()
         td.addLabelingIncremental('pos',3)
@@ -104,8 +104,8 @@ class VIEvaluator:
         td.addLabelingIncremental('ypr',3)
         td.reInit()
         self.tdgt = td
-        
-    def acquireData(self):
+
+    def acquireData(self, csvTimeCol = 0, csvPosCol = range(1, 4), csvAttCol = range(4, 8), csvVelCol = None, csvRorCol = None, timescale = 1., delimiter=','):
         if(self.bag.endswith('.bag')):
             if self.doCov:
                 RosDataAcquisition.rosBagLoadOdometry(self.bag, self.odomTopic ,self.td,'pos','att','vel','ror','posCov','attCov','velCov','rorCov')
@@ -123,26 +123,27 @@ class VIEvaluator:
                     RosDataAcquisition.rosBagLoadImuWithCovariance(self.bag, self.biasesTopic ,self.td,'gyb','acb','gybCov','acbCov')
                 else:
                     RosDataAcquisition.rosBagLoadImuWithCovariance(self.bag, self.biasesTopic ,self.td,'gyb','acb')
-        if(self.bag.endswith('data.csv')):
-            CsvDataAcquisition.csvLoadTransform(self.bag, 0, 1, 4, self.td, 'pos', 'att')
-            self.td.d[:,0] = self.td.d[:,0]*1e-9
-            attID = self.td.getColIDs('att')
-            q_real = self.td.col(attID[3])
-            q_im = -self.td.col(attID[0:3])
-            self.td.setCol(q_real,attID[0])
-            self.td.setCol(q_im,attID[1:4])
+        if(self.bag.endswith('.csv')):
+            CsvDataAcquisition.csvLoadTransform(self.bag, csvTimeCol, csvPosCol, csvAttCol, self.td, 'pos', 'att', csvVelCol, csvRorCol, 'vel', 'ror', delimiter=delimiter)
+            self.td.d[:,csvTimeCol] = self.td.d[:,csvTimeCol]*timescale
+            # attID = self.td.getColIDs('att')
+            # q_real = self.td.col(attID[3])
+            # q_im = -self.td.col(attID[0:3])
+            # self.td.setCol(q_real,attID[0])
+            # self.td.setCol(q_im,attID[1:4])
         self.td.applyTimeOffset(-self.td.getFirstTime())
-        
-    def acquireDataGT(self):
+
+    def acquireDataGT(self, csvTimeCol = 0, csvPosCol = range(1, 4), csvAttCol = range(4, 8), timescale = 1.):
         if(self.gtFile.endswith('.csv')):
-            CsvDataAcquisition.csvLoadTransform(self.gtFile, 0, 1, 4, self.tdgt, 'pos', 'att')
+            CsvDataAcquisition.csvLoadTransform(self.gtFile, csvTimeCol, csvPosCol, csvAttCol, self.tdgt, 'pos', 'att')
+            self.tdgt.d[:,csvTimeCol] = self.tdgt.d[:,csvTimeCol]*timescale
         elif(self.gtFile.endswith('.bag')):
             RosDataAcquisition.rosBagLoadTransformStamped(self.gtFile,self.gtTopic,self.tdgt,'pos','att')
         if(self.gtFile.endswith('data.csv')):
-            self.tdgt.d[:,0] = self.tdgt.d[:,0]*1e-9
-        self.tdgt.cropTimes(self.tdgt.getFirstTime()+self.startcut,self.tdgt.getLastTime()-self.endcut)
+            self.tdgt.d[:,0] = self.tdgt.d[:,0]*timescale
+        self.tdgt.cropTimes(self.tdgt.getFirstTime() + self.startcut,self.tdgt.getLastTime() - self.endcut)
         self.tdgt.applyTimeOffset(-self.tdgt.getFirstTime())
-        
+
     def alignTime(self):
         self.tdgt.computeNormOfColumns('ror','ron')
         self.td.computeNormOfColumns('ror','ron')
@@ -150,7 +151,7 @@ class VIEvaluator:
         to = self.td.getTimeOffset('ron',self.tdgt,'ron')
         self.td.applyTimeOffset(-to)
         self.td.cropTimes(self.tdgt.getFirstTime(),self.tdgt.getLastTime())
-    
+
     def alignBodyFrame(self):
         if(self.extraTransformPos != None or self.extraTransformAtt != None):
             if(self.alignMode == 0 or self.alignMode == 2):
@@ -199,7 +200,7 @@ class VIEvaluator:
             self.tdgt.applyBodyTransformFull('pos', 'att','vel', 'ror', B_r_BC_est, qCB_est)
             if(self.extraTransformPos != None or self.extraTransformAtt != None):
                 self.tdgt.applyBodyTransformFull('pos', 'att','vel', 'ror', self.extraTransformPos, self.extraTransformAtt)
-    
+
     def alignInertialFrame(self, calIDs=[0,1,2,3,4,5,6]):
         if(self.alignMode == 0 or self.alignMode == 2):
             J_r_JI_est, qIJ_est = self.td.calibrateInertialTransform('pos', 'att', self.tdgt, 'pos','att', np.array([0.0,0.0,0.0]), np.array([1.0,0.0,0.0,0.0]), calIDs)
@@ -213,7 +214,7 @@ class VIEvaluator:
             print('Quaternion Rotation qIJ_est:\tw:' + str(qIJ_est[0]) + '\tx:' + str(qIJ_est[1]) + '\ty:' + str(qIJ_est[2]) + '\tz:' + str(qIJ_est[3]))
             print('Translation Vector J_r_JI_est:\tx:' + str(J_r_JI_est[0]) + '\ty:' + str(J_r_JI_est[1]) + '\tz:' + str(J_r_JI_est[2]))
             self.tdgt.applyInertialTransform('pos', 'att',J_r_JI_est,qIJ_est)
-    
+
     def getAllDerivatives(self):
         if(self.derMode == 0):
             self.td.computeRatesFromPose('pos', 'att', 'vel', 'ror', self.aDer, self.bDer)
@@ -225,7 +226,7 @@ class VIEvaluator:
             self.tdgt.transformRatesFromWorldToBody('att', 'vel', 'ror')
         self.td.computeNormOfColumns('ror','ron')
         self.tdgt.computeNormOfColumns('ror','ron')
-    
+
     def getYpr(self):
         self.td.quaternionToYpr('att','ypr')
         if self.doCov:
@@ -236,7 +237,7 @@ class VIEvaluator:
                 self.td.quaternionToYprCov('extAtt','extAttCov','extYprCov')
         if(self.gtFile != ''):
             self.tdgt.quaternionToYpr('att','ypr')
-    
+
     def evaluateSigmaBounds(self, factor = 3):
         if self.doCov:
             self.td.computeSigmaBounds('pos','posCov','posSp','posSm',factor)
@@ -249,10 +250,10 @@ class VIEvaluator:
             if self.doBiases:
                 self.td.computeSigmaBounds('gyb','gybCov','gybSp','gybSm',factor)
                 self.td.computeSigmaBounds('acb','acbCov','acbSp','acbSm',factor)
-    
+
     def doLeutiEvaluation(self, figureId = -1):
         if len(self.plotLeutiDistances) > 0:
-            plt.ion()            
+            plt.ion()
             plt.show(block=False)
             if(figureId == -1):
                 figure()
@@ -269,7 +270,7 @@ class VIEvaluator:
                 ax.set_xticklabels(self.plotLeutiDistances)
                 ax.set_xlabel('Travelled Distance [m]')
                 ax.set_ylabel('Position Error [m]')
-            
+
             med = np.zeros(len(leutiOutputPos))
             for i in range(len(leutiOutputPos)):
                 med[i] = median(leutiOutputPos[i])
@@ -279,12 +280,12 @@ class VIEvaluator:
             if(figureId >= -1):
                 plot(p,fit)
                 title('Error Plot for Position, score = ' + str(score))
-            
+
             return [leutiOutputPos, leutiOutputAtt, leutiOutputYaw, leutiOutputIncl, score]
-    
+
     def doFeatureDepthEvaluation(self, figureId = -1, startTime = 25.0 ,plotFeaTimeEnd = 3.0, startAverage = 1.0, frequency = 20.0):
         if self.doNFeatures > 0 and figureId >= -1:
-            plt.ion()            
+            plt.ion()
             plt.show(block=False)
             if(figureId == -1):
                 figure()
@@ -301,7 +302,7 @@ class VIEvaluator:
                 self.td.applyRotationToCov(feaCovID[j], 'att', True)
                 for i in np.arange(0,3):
                     self.td.setCol(newFea[:,i],feaPosID[j][i])
-                   
+
                 lastStart = 0.0
                 lastID = -1
                 startID = 0
@@ -320,11 +321,11 @@ class VIEvaluator:
                             x[-1].append(self.td.d[i,self.td.timeID]-lastStart)
                             y[-1].append(self.td.d[i,feaPosID[j][2]])
                             cov[-1].append(sqrt(self.td.d[i,feaCovID[j][8]]))
-               
+
             axis = subplot(2,1,1)
             for i in np.arange(len(x)):
                 plot(x[i],y[i],color=Utils.colors['gray'])
-               
+
             average = 0
             averageCount = 0
             for i in np.arange(len(y)):
@@ -332,7 +333,7 @@ class VIEvaluator:
                     average += y[i][j]
                     averageCount += 1
             average = average/averageCount
-               
+
             means = []
             meanCovs = []
             stds = []
@@ -357,7 +358,7 @@ class VIEvaluator:
             plt.legend(loc=4)
             axis.set_ylabel('Landmark height [m]')
             plt.title('Convergence of Landmark Distance')
-               
+
             axis = subplot(2,1,2)
             line_th = plot([0, plotFeaTimeEnd], [sqrt(6.64), sqrt(6.64)],'--',color=Utils.colors['green'], lw=3, label='1\% threshold')
             for i in np.arange(len(x)):
