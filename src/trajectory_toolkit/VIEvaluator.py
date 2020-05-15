@@ -105,12 +105,12 @@ class VIEvaluator:
         td.reInit()
         self.tdgt = td
 
-    def acquireData(self, csvTimeCol = 0, csvPosCol = range(1, 4), csvAttCol = range(4, 8), csvVelCol = None, csvRorCol = None, timescale = 1., delimiter=','):
+    def acquireData(self, csvTimeCol = 0, csvPosCol = range(1, 4), csvAttCol = range(4, 8), csvVelCol = None, csvRorCol = None, timescale = 1., delimiter=',', start = 0):
         if(self.bag.endswith('.bag')):
             if self.doCov:
-                RosDataAcquisition.rosBagLoadOdometry(self.bag, self.odomTopic ,self.td,'pos','att','vel','ror','posCov','attCov','velCov','rorCov')
+                RosDataAcquisition.rosBagLoadOdometry(self.bag, self.odomTopic ,self.td,'pos','att','vel','ror','posCov','attCov','velCov','rorCov', start = start)
             else:
-                RosDataAcquisition.rosBagLoadOdometry(self.bag, self.odomTopic ,self.td,'pos','att','vel','ror')
+                RosDataAcquisition.rosBagLoadOdometry(self.bag, self.odomTopic ,self.td,'pos','att','vel','ror', start = start)
             if self.pclTopic != '' and self.doNFeatures > 0:
                 RosDataAcquisition.rosBagLoadRobocentricPointCloud(self.bag,self.pclTopic,self.td,'feaIdx','feaPos','feaCov','feaDis','feaDisCov')
             if self.extrinsicsTopic != '' and self.doExtrinsics:
@@ -124,13 +124,17 @@ class VIEvaluator:
                 else:
                     RosDataAcquisition.rosBagLoadImuWithCovariance(self.bag, self.biasesTopic ,self.td,'gyb','acb')
         if(self.bag.endswith('.csv')):
-            CsvDataAcquisition.csvLoadTransform(self.bag, csvTimeCol, csvPosCol, csvAttCol, self.td, 'pos', 'att', csvVelCol, csvRorCol, 'vel', 'ror', delimiter=delimiter)
+            CsvDataAcquisition.csvLoadTransform(self.bag, csvTimeCol, csvPosCol, csvAttCol, self.td,
+                                                'pos', 'att', csvVelCol, csvRorCol,
+                                                'vel', 'ror', delimiter=delimiter, start = start)
             self.td.d[:,csvTimeCol] = self.td.d[:,csvTimeCol]*timescale
             # attID = self.td.getColIDs('att')
             # q_real = self.td.col(attID[3])
             # q_im = -self.td.col(attID[0:3])
             # self.td.setCol(q_real,attID[0])
             # self.td.setCol(q_im,attID[1:4])
+        # self.td.d = self.td.d[start:, :]
+        # self.td.last = self.td.d.shape[0] - 1
         self.td.applyTimeOffset(-self.td.getFirstTime())
 
     def acquireDataGT(self, csvTimeCol = 0, csvPosCol = range(1, 4), csvAttCol = range(4, 8), timescale = 1.):

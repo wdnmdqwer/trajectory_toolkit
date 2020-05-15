@@ -12,7 +12,7 @@ def addTransformStamped(td, ind, msg, pos = None, att = None):
     attID = td.getColIDs(att)
     if attID != None:
         td.d[ind, attID] = np.array([msg.transform.rotation.w,msg.transform.rotation.x,msg.transform.rotation.y,msg.transform.rotation.z]);
-    
+
 def addPoseWithCovariance(td, ind, msg, pos = None, att = None, posCov = None, attCov = None):
     posID = td.getColIDs(pos)
     if posID != None:
@@ -30,7 +30,7 @@ def addPoseWithCovariance(td, ind, msg, pos = None, att = None, posCov = None, a
         td.d[ind, attCovID] = np.array([msg.pose.covariance[21],msg.pose.covariance[22],msg.pose.covariance[23],
                                                        msg.pose.covariance[27],msg.pose.covariance[28],msg.pose.covariance[29],
                                                        msg.pose.covariance[33],msg.pose.covariance[34],msg.pose.covariance[35]]);
-    
+
 def addTwistWithCovariance(td, ind, msg, vel = None, ror = None, velCov = None, rorCov = None):
     velID = td.getColIDs(vel)
     if velID != None:
@@ -52,7 +52,7 @@ def addTwistWithCovariance(td, ind, msg, vel = None, ror = None, velCov = None, 
 def addOdometry(td, ind, msg, posID = None, attID = None, velID = None, rorID = None, posCovID = None, attCovID = None, velCovID = None, rorCovID = None):
     addPoseWithCovariance(td,ind,msg,posID,attID,posCovID,attCovID)
     addTwistWithCovariance(td,ind,msg,velID,rorID,velCovID,rorCovID)
-    
+
 def addRobocentricPointCloud(td, ind, msg, rovio_fea_idx, rovio_fea_pos, rovio_fea_cov = None, rovio_fea_dis = None, rovio_fea_disCov = None):
     rovio_fea_idxID = td.getColIDs(rovio_fea_idx)
     rovio_fea_posID = td.getColIDs(rovio_fea_pos)
@@ -71,7 +71,7 @@ def addRobocentricPointCloud(td, ind, msg, rovio_fea_idx, rovio_fea_pos, rovio_f
             td.d[ind, rovio_fea_idxID[i]] = idValue
         if rovio_fea_posID != None:
             td.d[ind, rovio_fea_posID[i]] = np.array([xValue, yValue, zValue])
-    
+
     rovio_fea_covID = td.getColIDs(rovio_fea_cov)
     if rovio_fea_covID != None:
         c00Field, = [x for x in msg.fields if x.name == 'c_00']
@@ -88,7 +88,7 @@ def addRobocentricPointCloud(td, ind, msg, rovio_fea_idx, rovio_fea_pos, rovio_f
             c12Value, = struct.unpack('f', msg.data[i*step+c12Field.offset:i*step+c12Field.offset+4])
             c22Value, = struct.unpack('f', msg.data[i*step+c22Field.offset:i*step+c22Field.offset+4])
             td.d[ind, rovio_fea_covID[i]] = np.array([c00Value, c01Value, c02Value, c01Value, c11Value, c12Value, c02Value, c12Value, c22Value])
-    
+
     rovio_fea_disID = td.getColIDs(rovio_fea_dis)
     if rovio_fea_disID != None:
         disField, = [x for x in msg.fields if x.name == 'd']
@@ -124,7 +124,7 @@ class TransformStampedListener:
     td = TimedData(0)
     posID = [1, 2, 3]
     attID = [4, 5, 6, 7]
-    
+
     def __init__(self, td, topic, posID = [1, 2, 3], attID = [4, 5, 6, 7]):
         self.td = td
         self.posID = posID
@@ -134,7 +134,7 @@ class TransformStampedListener:
         self.td.append()
         self.td.d[self.td.last, self.td.timeID] = msg.header.stamp.to_sec();
         addTransformStamped(self.td, self.td.last, msg, self.posID, self.attID)
-            
+
 def rosBagCountTopic(bag, topic, t1 = None, t2 = None):
     counter = 0
     for _, msg, _ in bag.read_messages(topics=[topic]):
@@ -172,16 +172,27 @@ def rosBagLoadTransformStamped(filename, topic, td, posID, attID):
                 print('Could not merge entry into already existing Timed Data');
     bag.close()
 
-def rosBagLoadOdometry(filename, topic, td, posID = None, attID = None, velID = None, rorID = None, posCovID = None, attCovID = None, velCovID = None, rorCovID = None, t1 = None, t2 = None, pruneDuplicate = None):
+def rosBagLoadOdometry(filename, topic, td, posID = None, attID = None, velID = None, rorID = None, posCovID = None, attCovID = None, velCovID = None, rorCovID = None, t1 = None, t2 = None, pruneDuplicate = None, start = 0):
     bag = rb.Bag(filename)
     count = rosBagCountTopic(bag,topic,t1,t2)
     print("loading " + filename + ", found " + str(count) +" "+ topic +" entries")
+    counter = 0
     for _, msg, _ in bag.read_messages(topics=[topic]):
+        if counter < start:
+            counter += 1
+            continue
         firstTime = msg.header.stamp.to_sec()
+        counter += 1
         break
     lastMsg = None
     if( td.last == (-1) ):
+        counter = 0
         for _, msg, _ in bag.read_messages(topics=[topic]):
+            if counter < start:
+                counter += 1
+                continue
+            # print("counter: ", counter)
+            counter += 1
             if t1 and msg.header.stamp.to_sec() < firstTime + t1:
                 continue
             if t2 and msg.header.stamp.to_sec() > firstTime + t2:
@@ -288,10 +299,10 @@ def rosBagLoadTimestampsOnly(filename, topic, td, t1 = None, t2 = None):
     else:
         print('Implement functionality when timedata is not empty');
     bag.close()
-    
-    
-    
-    
-    
-    
-    
+
+
+
+
+
+
+

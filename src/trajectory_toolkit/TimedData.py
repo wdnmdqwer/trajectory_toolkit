@@ -482,6 +482,69 @@ class TimedData:
             else:
                 self.d[i,covIDs] = np.resize(np.dot(np.dot(R,np.resize(self.d[i,covIDs],(3,3))),R.T),(9))
 
+    def computeRMS(self, pos1, att1, other, pos2, att2, start):
+        posID1 = self.getColIDs(pos1)
+        attID1 = self.getColIDs(att1)
+        posID2 = other.getColIDs(pos2)
+        attID2 = other.getColIDs(att2)
+        output = np.empty((1,6))
+        outputPosFull = []
+        outputAttFull = []
+        outputYawFull = []
+        outputInclFull = []
+        startIndex = np.nonzero(self.getTime() >= start)[0][0]
+
+        posErrors = []
+        attErrors = []
+        yawErrors = []
+        inclErrors = []
+
+        other_interp = TimedData(8)
+        other_interp.initEmptyFromTimes(self.getTime())
+        other.interpolateColumns(other_interp, posID2, [1,2,3])
+        other.interpolateQuaternion(other_interp, attID2, [4,5,6,7])
+
+        it = startIndex
+        while it+1<self.last:
+            pos1 = Quaternion.q_rotate(self.d[startIndex,attID1], self.d[it,posID1]-self.d[startIndex,posID1])
+            pos2 = Quaternion.q_rotate(other_interp.d[startIndex,[4,5,6,7]], other_interp.d[it,[1,2,3]]-other_interp.d[startIndex,[1,2,3]])
+            att1 = self.d[it,attID1]
+            att2 = Quaternion.q_mult(other_interp.d[it, [4,5,6,7]],
+                                     Quaternion.q_mult(Quaternion.q_inverse(other_interp.d[startIndex, [4,5,6,7]]),
+                                     self.d[startIndex,attID1]))
+            posErrors.append(np.asscalar(np.sum((pos2-pos1)**2,axis=-1)))
+            attErrors.append(np.asscalar(np.sum((Quaternion.q_boxMinus(att1,att2))**2,axis=-1)))
+            yawError = Quaternion.q_toYpr(Quaternion.q_mult(Quaternion.q_inverse(att2),att1))[2]
+            yawErrors.append(yawError**2)
+            att2_cor = Quaternion.q_mult(att2,Quaternion.q_exp(np.array([0.0,0.0,yawError])))
+            inclErrors.append(np.asscalar(np.sum((Quaternion.q_boxMinus(att1,att2_cor))**2,axis=-1)))
+            it += 1
+        N = Utils.getLen(posErrors)
+        posErrorRMS = (np.sum(posErrors,axis=-1)/N)**(0.5)
+        posErrorMedian = np.median(posErrors)**(0.5)
+        posErrorStd = np.std(np.array(posErrors)**(0.5))
+        attErrorRMS = (np.sum(attErrors,axis=-1)/N)**(0.5)
+        attErrorMedian = np.median(attErrors)**(0.5)
+        attErrorStd = np.std(np.array(attErrors)**(0.5))
+        yawErrorRMS = (np.sum(yawErrors,axis=-1)/N)**(0.5)
+        yawErrorMedian = np.median(yawErrors)**(0.5)
+        yawErrorStd = np.std(np.array(yawErrors)**(0.5))
+        inclErrorRMS = (np.sum(inclErrors,axis=-1)/N)**(0.5)
+        inclErrorMedian = np.median(inclErrors)**(0.5)
+        inclErrorStd = np.std(np.array(inclErrors)**(0.5))
+        rad2deg = 57.3
+        print('Evaluated ' + str(N) \
+               + ':\n  posRMS of ' + str(posErrorRMS) + ' (Median: ' + str(posErrorMedian) + ', Std: ' + str(posErrorStd) + ')' \
+               + '\n  attRMS of ' + str(attErrorRMS*rad2deg) + ' (Median: ' + str(attErrorMedian*rad2deg) + ', Std: ' + str(attErrorStd*rad2deg) + ')' \
+               + '\n  yawRMS of ' + str(yawErrorRMS*rad2deg) + ' (Median: ' + str(yawErrorMedian*rad2deg) + ', Std: ' + str(yawErrorStd*rad2deg) + ')' \
+               + '\n  inclRMS of ' + str(inclErrorRMS*rad2deg) + ' (Median: ' + str(inclErrorMedian*rad2deg) + ', Std: ' + str(inclErrorStd*rad2deg) + ')')
+        # output[0,:] = [posErrorRMS, posErrorMedian, posErrorStd, attErrorRMS, attErrorMedian, attErrorStd]
+        # outputPosFull.append(np.array(posErrors)**(0.5))
+        # outputAttFull.append(np.array(attErrors)**(0.5))
+        # outputYawFull.append(np.array(yawErrors)**(0.5))
+        # outputInclFull.append(np.array(inclErrors)**(0.5))
+        return posErrorRMS, posErrorMedian, posErrorStd, attErrorRMS, attErrorMedian, attErrorStd
+
     def computeLeutiScore(self, pos1, att1, vel1, other, pos2, att2, distances, spacings, start):
         posID1 = self.getColIDs(pos1)
         attID1 = self.getColIDs(att1)
@@ -548,11 +611,12 @@ class TimedData:
             inclErrorRMS = (np.sum(inclErrors,axis=-1)/N)**(0.5)
             inclErrorMedian = np.median(inclErrors)**(0.5)
             inclErrorStd = np.std(np.array(inclErrors)**(0.5))
+            rad2deg = 57.3
             print('Evaluated ' + str(N) + ' segments with a travelled distance of ' + str(distances[j]) \
                    + ':\n  posRMS of ' + str(posErrorRMS) + ' (Median: ' + str(posErrorMedian) + ', Std: ' + str(posErrorStd) + ')' \
-                   + '\n  attRMS of ' + str(attErrorRMS) + ' (Median: ' + str(attErrorMedian) + ', Std: ' + str(attErrorStd) + ')' \
-                   + '\n  yawRMS of ' + str(yawErrorRMS) + ' (Median: ' + str(yawErrorMedian) + ', Std: ' + str(yawErrorStd) + ')' \
-                   + '\n  inclRMS of ' + str(inclErrorRMS) + ' (Median: ' + str(inclErrorMedian) + ', Std: ' + str(inclErrorStd) + ')')
+                   + '\n  attRMS of ' + str(attErrorRMS*rad2deg) + ' (Median: ' + str(attErrorMedian*rad2deg) + ', Std: ' + str(attErrorStd*rad2deg) + ')' \
+                   + '\n  yawRMS of ' + str(yawErrorRMS*rad2deg) + ' (Median: ' + str(yawErrorMedian*rad2deg) + ', Std: ' + str(yawErrorStd*rad2deg) + ')' \
+                   + '\n  inclRMS of ' + str(inclErrorRMS*rad2deg) + ' (Median: ' + str(inclErrorMedian*rad2deg) + ', Std: ' + str(inclErrorStd*rad2deg) + ')')
             output[j,:] = [posErrorRMS, posErrorMedian, posErrorStd, attErrorRMS, attErrorMedian, attErrorStd]
             outputPosFull.append(np.array(posErrors)**(0.5))
             outputAttFull.append(np.array(attErrors)**(0.5))
