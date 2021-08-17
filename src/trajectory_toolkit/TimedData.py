@@ -482,11 +482,13 @@ class TimedData:
             else:
                 self.d[i,covIDs] = np.resize(np.dot(np.dot(R,np.resize(self.d[i,covIDs],(3,3))),R.T),(9))
 
-    def computeRMS(self, pos1, att1, other, pos2, att2, start):
+    def computeRMS(self, pos1, att1, vel1, other, pos2, att2, vel2, start):
         posID1 = self.getColIDs(pos1)
         attID1 = self.getColIDs(att1)
         posID2 = other.getColIDs(pos2)
         attID2 = other.getColIDs(att2)
+        velID1 = self.getColIDs(vel1)
+        velID2 = other.getColIDs(vel2)
         output = np.empty((1,6))
         outputPosFull = []
         outputAttFull = []
@@ -498,21 +500,23 @@ class TimedData:
         attErrors = []
         yawErrors = []
         inclErrors = []
+        velErrors = []
 
-        other_interp = TimedData(8)
+        other_interp = TimedData(11)
         other_interp.initEmptyFromTimes(self.getTime())
         other.interpolateColumns(other_interp, posID2, [1,2,3])
         other.interpolateQuaternion(other_interp, attID2, [4,5,6,7])
+        if vel1 is not None and vel2 is not None:
+            other.interpolateColumns(other_interp, vel2, [8,9,10])
 
         it = startIndex
         while it+1<self.last:
-            pos1 = Quaternion.q_rotate(self.d[startIndex,attID1], self.d[it,posID1]-self.d[startIndex,posID1])
-            pos2 = Quaternion.q_rotate(other_interp.d[startIndex,[4,5,6,7]], other_interp.d[it,[1,2,3]]-other_interp.d[startIndex,[1,2,3]])
             att1 = self.d[it,attID1]
             att2 = Quaternion.q_mult(other_interp.d[it, [4,5,6,7]],
                                      Quaternion.q_mult(Quaternion.q_inverse(other_interp.d[startIndex, [4,5,6,7]]),
                                      self.d[startIndex,attID1]))
-            posErrors.append(np.asscalar(np.sum((pos2-pos1)**2,axis=-1)))
+            posErrors.append(np.asscalar(np.sum((self.d[it,posID1]-other_interp.d[it,[1,2,3]])**2,axis=-1)))
+            velErrors.append(np.asscalar(np.sum((self.d[it,velID1]-other_interp.d[it,[8,9,10]])**2,axis=-1)))
             attErrors.append(np.asscalar(np.sum((Quaternion.q_boxMinus(att1,att2))**2,axis=-1)))
             yawError = Quaternion.q_toYpr(Quaternion.q_mult(Quaternion.q_inverse(att2),att1))[2]
             yawErrors.append(yawError**2)
@@ -523,6 +527,9 @@ class TimedData:
         posErrorRMS = (np.sum(posErrors,axis=-1)/N)**(0.5)
         posErrorMedian = np.median(posErrors)**(0.5)
         posErrorStd = np.std(np.array(posErrors)**(0.5))
+        velErrorRMS = (np.sum(velErrors,axis=-1)/N)**(0.5)
+        velErrorMedian = np.median(velErrors)**(0.5)
+        velErrorStd = np.std(np.array(velErrors)**(0.5))
         attErrorRMS = (np.sum(attErrors,axis=-1)/N)**(0.5)
         attErrorMedian = np.median(attErrors)**(0.5)
         attErrorStd = np.std(np.array(attErrors)**(0.5))
@@ -535,6 +542,7 @@ class TimedData:
         rad2deg = 57.3
         print('Evaluated ' + str(N) \
                + ':\n  posRMS of ' + str(posErrorRMS) + ' (Median: ' + str(posErrorMedian) + ', Std: ' + str(posErrorStd) + ')' \
+               + '\n  velRMS of ' + str(velErrorRMS) + ' (Median: ' + str(velErrorMedian) + ', Std: ' + str(velErrorStd) + ')'\
                + '\n  attRMS of ' + str(attErrorRMS*rad2deg) + ' (Median: ' + str(attErrorMedian*rad2deg) + ', Std: ' + str(attErrorStd*rad2deg) + ')' \
                + '\n  yawRMS of ' + str(yawErrorRMS*rad2deg) + ' (Median: ' + str(yawErrorMedian*rad2deg) + ', Std: ' + str(yawErrorStd*rad2deg) + ')' \
                + '\n  inclRMS of ' + str(inclErrorRMS*rad2deg) + ' (Median: ' + str(inclErrorMedian*rad2deg) + ', Std: ' + str(inclErrorStd*rad2deg) + ')')
@@ -642,6 +650,10 @@ class TimedData:
                 data = data + separator + str(extractedCols[i,j])
             with open(fileOut, 'w') as infoFile:
                 infoFile.write(data)
+    def averageFilter(self, smoothwin = 10):
+        box = np.ones((smoothwin,))/smoothwin
+        for i in range(1, self.d.shape[1]):
+            self.d[:, i] = np.convolve(self.d[:, i], box, mode='same')
 
 
 

@@ -38,6 +38,7 @@ class VIEvaluator:
     bDerGT = 3
     plotLeutiDistances = []
     leutiSpacing = 0
+    verbose = False
 
     def initTimedData(self,td):
         td.clearLabeling()
@@ -123,7 +124,7 @@ class VIEvaluator:
                     RosDataAcquisition.rosBagLoadImuWithCovariance(self.bag, self.biasesTopic ,self.td,'gyb','acb','gybCov','acbCov')
                 else:
                     RosDataAcquisition.rosBagLoadImuWithCovariance(self.bag, self.biasesTopic ,self.td,'gyb','acb')
-        if(self.bag.endswith('.csv')):
+        if(self.bag.endswith('.csv') or self.bag.endswith('.txt')):
             CsvDataAcquisition.csvLoadTransform(self.bag, csvTimeCol, csvPosCol, csvAttCol, self.td,
                                                 'pos', 'att', csvVelCol, csvRorCol,
                                                 'vel', 'ror', delimiter=delimiter, start = start)
@@ -168,24 +169,27 @@ class VIEvaluator:
                         print('Warning: Covariance are not properly mapped if there is a translational component on the Body transform')
         if(self.alignMode == 0):
             B_r_BC_est, qCB_est = self.td.calibrateBodyTransform('vel', 'ror', self.tdgt, 'vel','ror')
-            print('Align Body Transform (estimate to GT):')
-            print('Quaternion Rotation qCB_est:\tw:' + str(qCB_est[0]) + '\tx:' + str(qCB_est[1]) + '\ty:' + str(qCB_est[2]) + '\tz:' + str(qCB_est[3]))
-            print('Translation Vector B_r_BC_est:\tx:' + str(B_r_BC_est[0]) + '\ty:' + str(B_r_BC_est[1]) + '\tz:' + str(B_r_BC_est[2]))
+            if self.verbose:
+                print('Align Body Transform (estimate to GT):')
+                print('Quaternion Rotation qCB_est:\tw:' + str(qCB_est[0]) + '\tx:' + str(qCB_est[1]) + '\ty:' + str(qCB_est[2]) + '\tz:' + str(qCB_est[3]))
+                print('Translation Vector B_r_BC_est:\tx:' + str(B_r_BC_est[0]) + '\ty:' + str(B_r_BC_est[1]) + '\tz:' + str(B_r_BC_est[2]))
             self.td.applyBodyTransformFull('pos', 'att','vel', 'ror', B_r_BC_est, qCB_est)
             if(self.doCov):
                 print('Warning: Covariance are not properly for Body alignment of estimate to GT, please use the other direction')
         if(self.alignMode == 1):
             B_r_BC_est, qCB_est = self.tdgt.calibrateBodyTransform('vel', 'ror', self.td, 'vel','ror')
-            print('Align Body Transform (GT to estimate):')
-            print('Quaternion Rotation qCB_est:\tw:' + str(qCB_est[0]) + '\tx:' + str(qCB_est[1]) + '\ty:' + str(qCB_est[2]) + '\tz:' + str(qCB_est[3]))
-            print('Translation Vector B_r_BC_est:\tx:' + str(B_r_BC_est[0]) + '\ty:' + str(B_r_BC_est[1]) + '\tz:' + str(B_r_BC_est[2]))
+            if self.verbose:
+                print('Align Body Transform (GT to estimate):')
+                print('Quaternion Rotation qCB_est:\tw:' + str(qCB_est[0]) + '\tx:' + str(qCB_est[1]) + '\ty:' + str(qCB_est[2]) + '\tz:' + str(qCB_est[3]))
+                print('Translation Vector B_r_BC_est:\tx:' + str(B_r_BC_est[0]) + '\ty:' + str(B_r_BC_est[1]) + '\tz:' + str(B_r_BC_est[2]))
             self.tdgt.applyBodyTransformFull('pos', 'att','vel', 'ror', B_r_BC_est, qCB_est)
         if(self.alignMode == 2):
             B_r_BC_est = self.MrMV
             qCB_est = self.qVM
-            print('Fixed Body Alignment (estimate to GT):')
-            print('Quaternion Rotation qCB_est:\tw:' + str(qCB_est[0]) + '\tx:' + str(qCB_est[1]) + '\ty:' + str(qCB_est[2]) + '\tz:' + str(qCB_est[3]))
-            print('Translation Vector B_r_BC_est:\tx:' + str(B_r_BC_est[0]) + '\ty:' + str(B_r_BC_est[1]) + '\tz:' + str(B_r_BC_est[2]))
+            if self.verbose:
+                print('Fixed Body Alignment (estimate to GT):')
+                print('Quaternion Rotation qCB_est:\tw:' + str(qCB_est[0]) + '\tx:' + str(qCB_est[1]) + '\ty:' + str(qCB_est[2]) + '\tz:' + str(qCB_est[3]))
+                print('Translation Vector B_r_BC_est:\tx:' + str(B_r_BC_est[0]) + '\ty:' + str(B_r_BC_est[1]) + '\tz:' + str(B_r_BC_est[2]))
             self.td.applyBodyTransformFull('pos', 'att','vel', 'ror', B_r_BC_est, qCB_est)
             if(self.doCov):
                 print('Warning: Covariance are not properly for Body alignment of estimate to GT, please use the other direction')
@@ -198,9 +202,10 @@ class VIEvaluator:
         if(self.alignMode == 3):
             B_r_BC_est = -Quaternion.q_rotate(self.qVM, self.MrMV)
             qCB_est = Quaternion.q_inverse(self.qVM)
-            print('Fixed Body Alignment (GT to estimate):')
-            print('Quaternion Rotation qCB_est:\tw:' + str(qCB_est[0]) + '\tx:' + str(qCB_est[1]) + '\ty:' + str(qCB_est[2]) + '\tz:' + str(qCB_est[3]))
-            print('Translation Vector B_r_BC_est:\tx:' + str(B_r_BC_est[0]) + '\ty:' + str(B_r_BC_est[1]) + '\tz:' + str(B_r_BC_est[2]))
+            if self.verbose:
+                print('Fixed Body Alignment (GT to estimate):')
+                print('Quaternion Rotation qCB_est:\tw:' + str(qCB_est[0]) + '\tx:' + str(qCB_est[1]) + '\ty:' + str(qCB_est[2]) + '\tz:' + str(qCB_est[3]))
+                print('Translation Vector B_r_BC_est:\tx:' + str(B_r_BC_est[0]) + '\ty:' + str(B_r_BC_est[1]) + '\tz:' + str(B_r_BC_est[2]))
             self.tdgt.applyBodyTransformFull('pos', 'att','vel', 'ror', B_r_BC_est, qCB_est)
             if(self.extraTransformPos != None or self.extraTransformAtt != None):
                 self.tdgt.applyBodyTransformFull('pos', 'att','vel', 'ror', self.extraTransformPos, self.extraTransformAtt)
@@ -208,15 +213,17 @@ class VIEvaluator:
     def alignInertialFrame(self, calIDs=[0,1,2,3,4,5,6]):
         if(self.alignMode == 0 or self.alignMode == 2):
             J_r_JI_est, qIJ_est = self.td.calibrateInertialTransform('pos', 'att', self.tdgt, 'pos','att', np.array([0.0,0.0,0.0]), np.array([1.0,0.0,0.0,0.0]), calIDs)
-            print('Align Inertial Transform (estimate to GT):')
-            print('Quaternion Rotation qIJ_est:\tw:' + str(qIJ_est[0]) + '\tx:' + str(qIJ_est[1]) + '\ty:' + str(qIJ_est[2]) + '\tz:' + str(qIJ_est[3]))
-            print('Translation Vector J_r_JI_est:\tx:' + str(J_r_JI_est[0]) + '\ty:' + str(J_r_JI_est[1]) + '\tz:' + str(J_r_JI_est[2]))
+            if self.verbose:
+                print('Align Inertial Transform (estimate to GT):')
+                print('Quaternion Rotation qIJ_est:\tw:' + str(qIJ_est[0]) + '\tx:' + str(qIJ_est[1]) + '\ty:' + str(qIJ_est[2]) + '\tz:' + str(qIJ_est[3]))
+                print('Translation Vector J_r_JI_est:\tx:' + str(J_r_JI_est[0]) + '\ty:' + str(J_r_JI_est[1]) + '\tz:' + str(J_r_JI_est[2]))
             self.td.applyInertialTransform('pos', 'att',J_r_JI_est,qIJ_est)
         if(self.alignMode == 1 or self.alignMode == 3):
             J_r_JI_est, qIJ_est = self.tdgt.calibrateInertialTransform('pos', 'att', self.td, 'pos','att', np.array([0.0,0.0,0.0]), np.array([1.0,0.0,0.0,0.0]), calIDs)
-            print('Align Inertial Transform (GT to estimate):')
-            print('Quaternion Rotation qIJ_est:\tw:' + str(qIJ_est[0]) + '\tx:' + str(qIJ_est[1]) + '\ty:' + str(qIJ_est[2]) + '\tz:' + str(qIJ_est[3]))
-            print('Translation Vector J_r_JI_est:\tx:' + str(J_r_JI_est[0]) + '\ty:' + str(J_r_JI_est[1]) + '\tz:' + str(J_r_JI_est[2]))
+            if self.verbose:
+                print('Align Inertial Transform (GT to estimate):')
+                print('Quaternion Rotation qIJ_est:\tw:' + str(qIJ_est[0]) + '\tx:' + str(qIJ_est[1]) + '\ty:' + str(qIJ_est[2]) + '\tz:' + str(qIJ_est[3]))
+                print('Translation Vector J_r_JI_est:\tx:' + str(J_r_JI_est[0]) + '\ty:' + str(J_r_JI_est[1]) + '\tz:' + str(J_r_JI_est[2]))
             self.tdgt.applyInertialTransform('pos', 'att',J_r_JI_est,qIJ_est)
 
     def getAllDerivatives(self):

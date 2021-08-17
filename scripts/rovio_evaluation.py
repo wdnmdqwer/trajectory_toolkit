@@ -20,9 +20,13 @@ plotExt = True
 td_rovio = TimedData()
 td_vicon = TimedData()
 
-video_path_prefix = "/home/zsk/Downloads/mynt/zsk/"
-yaml_path = "mynt.yaml"
-gt_path_prefix = "/home/zsk/Downloads/mynt/zsk/gt/"
+datasource = 'bebop'
+if datasource == 'mynt':
+    video_path_prefix = "/home/zsk/Downloads/mynt/zsk/"
+    gt_path_prefix = "/home/zsk/Downloads/mynt/zsk/gt/"
+elif datasource == 'bebop':
+    video_path_prefix = "/home/zsk/Downloads/bebop2data/"
+    gt_path_prefix = "/home/zsk/Downloads/bebop2data/gt/"
 est_result_path_prefix = "/home/zsk/of_velocity/results"
 
 datas = [
@@ -34,12 +38,24 @@ datas = [
     # ("2019_08_04_20_50_00", "Take 2019-08-04 08.50.26 PM.csv"), # vins start after 20s
     # ("2019_08_04_20_43_00", "Take 2019-08-04 08.44.19 PM.csv"),
 
-    ("2020_04_28_12_44_23", "Take 2020-04-28 12.44.38 AM.csv"), # 0.51, 1.27
+
+    # bebop data
+    # ("2020_04_28_12_44_23", "Take 2020-04-28 12.44.38 AM.csv"), # 0.51, 1.27
+    # ("2020_04_16_20_16_01", "Take 2020-04-16 08.16.03 PM.csv"), # 0.65, 1.37
+    # ("2020_04_28_13_37_49", "Take 2020-04-28 01.38.04 PM.csv"), # 0.77, 1.58
+    # ("2020_04_28_13_54_45", "Take 2020-04-28 01.55.00 PM.csv"), # 0.82, 1.81
+    # ("2020_04_10_13_01_11", "Take 2020-04-10 01.01.10 PM.csv"),
+    # ("2020_04_10_15_10_06", "Take 2020-04-10 03.10.04 PM.csv"),
+    # ("2020_03_14_20_00_11", "Take 2020-03-14 08.00.23 PM.csv"),
+    # ("2020_04_10_15_19_49", "Take 2020-04-10 03.19.49 PM.csv"),
+    ("2020_10_23_13_18_39", "Take 2020-10-23 01.18.37 PM.csv"),
+    ("2020_10_23_19_13_51", "Take 2020-10-23 07.13.54 PM.csv"),
 ]
-# evaluate = "vins"
+evaluate = "vins"
 # evaluate = "rovio"
-evaluate = "dkf"
+# evaluate = "dkf"
 draw_fig = False
+# draw_fig = False
 for seq_name, gt_name in datas:
     rovioEvaluator = VIEvaluator.VIEvaluator()
     if evaluate == "vins":
@@ -47,11 +63,13 @@ for seq_name, gt_name in datas:
         rovioEvaluator.bag = "%s/%s/vins_result_loop.csv"%(video_path_prefix, seq_name)
     elif evaluate == "rovio":
         # os.system('roslaunch rovio mynt_rosbag_node.launch seq_name:="%s"'% seq_name)
+        os.system('roslaunch rovio bebop2_rosbag_node.launch seq_name:="%s"'% seq_name)
         rovioEvaluator.bag = "%s/%s/rovio_default.bag"%(video_path_prefix, seq_name)
         rovioEvaluator.odomTopic = '/rovio/odometry'
     else:
-        # rovioEvaluator.bag = "%s/%s_direct/%s_est.csv"%(est_result_path_prefix, seq_name, seq_name)
-        rovioEvaluator.bag = "%s/%s/direct/%s_est.csv"%(est_result_path_prefix, seq_name, seq_name)
+        # rovioEvaluator.bag = "%s/%s_direct/%s_est.txt"%(est_result_path_prefix, seq_name, seq_name)
+        rovioEvaluator.bag = "%s/%s/direct/%s_est.txt"%(est_result_path_prefix, seq_name, seq_name)
+        # rovioEvaluator.bag = "%s/%s/direct/%s_est.csv"%(est_result_path_prefix, seq_name, seq_name)
 # rovioEvaluator.pclTopic = '/rovio/pcl'
 # rovioEvaluator.extrinsicsTopic = '/rovio/extrinsics0'
     rovioEvaluator.gtFile = gt_path_prefix+gt_name
@@ -78,24 +96,29 @@ for seq_name, gt_name in datas:
         delimiter = ','
         timescale = 1e-9
         rovioEvaluator.derMode = 0
-        start = 150
+        start = 450
     elif evaluate in ["dkf", "rovio"]:
         estTimeCol = 0
         estPosCol = [1, 2, 3]
         estAttCol = [4, 5, 6, 7]
         estVelCol = [9, 10, 11]
-        estRorCol = [23, 24, 25]
+        estRorCol = [22, 23, 24]
         delimiter = ' '
         timescale = 1.
-        start = 150
+        if datasource == 'bebop':
+            start = 450
+        else:
+            start = 150
 
     rovioEvaluator.initTimedData(td_rovio)
     rovioEvaluator.initTimedDataGT(td_vicon)
     rovioEvaluator.acquireData(estTimeCol, estPosCol, estAttCol, estVelCol, estRorCol, delimiter=delimiter, timescale = timescale, start = start)
     rovioEvaluator.acquireDataGT(gtTimeCol, gtPosCol, gtAttCol)
+    td_vicon.averageFilter(smoothwin = 10)
+    attIds = td_vicon.getColIDs('att')
+    qnorm = np.linalg.norm(td_vicon.d[:, attIds], axis = 1, keepdims = 1)
+    td_vicon.d[:, attIds] /= np.repeat(qnorm, 4, axis = 1)
 
-    # attIds = td_vicon.getColIDs('att')
-    # td_vicon.d[:, attIds[1:]] *= -1
 
     # attIds = td_rovio.getColIDs('att')
     # td_rovio.d[:, attIds[1:]] *= -1
@@ -106,46 +129,46 @@ for seq_name, gt_name in datas:
     rovioEvaluator.alignInertialFrame()
     rovioEvaluator.getYpr()
     rovioEvaluator.evaluateSigmaBounds()
-    td_rovio.computeRMS('pos', 'att', td_vicon, 'pos', 'att', 0.0)
-
-    if plotPos and draw_fig: # Position plotting
-        plotterPos = Plotter(-1, [3,1],'Position',['','','time[s]'],['x[m]','y[m]','z[m]'],10000)
-        if rovioEvaluator.doCov:
-            plotterPos.addDataToSubplotMultiple(td_rovio, 'posSm', [1,2,3], ['r--','r--','r--'], ['','',''])
-            plotterPos.addDataToSubplotMultiple(td_rovio, 'posSp', [1,2,3], ['r--','r--','r--'], ['','',''])
-        plotterPos.addDataToSubplotMultiple(td_rovio, 'pos', [1,2,3], ['r','r','r'], ['','',''])
-        plotterPos.addDataToSubplotMultiple(td_vicon, 'pos', [1,2,3], ['b','b','b'], ['','',''])
-
-    if plotVel and draw_fig: # Velocity plotting
-        plotterVel = Plotter(-1, [3,1],'Robocentric Velocity',['','','time[s]'],['$v_x$[m/s]','$v_y$[m/s]','$v_z$[m/s]'],10000)
-        plotterVel.addDataToSubplotMultiple(td_rovio, 'vel', [1,2,3], ['r','r','r'], ['','',''])
-        plotterVel.addDataToSubplotMultiple(td_vicon, 'vel', [1,2,3], ['b','b','b'], ['','',''])
-
-    if plotAtt and draw_fig: # Attitude plotting
-        plotterAtt = Plotter(-1, [4,1],'Attitude Quaternion',['','','','time[s]'],['w[1]','x[1]','y[1]','z[1]'],10000)
-        plotterAtt.addDataToSubplotMultiple(td_rovio, 'att', [1,2,3,4], ['r','r','r','r'], ['','','',''])
-        plotterAtt.addDataToSubplotMultiple(td_vicon, 'att', [1,2,3,4], ['b','b','b','b'], ['','','',''])
-
-    if plotYpr and draw_fig: # Yaw-pitch-roll plotting
-        plotterYpr = Plotter(-1, [3,1],'Yaw-Pitch-Roll Decomposition',['','','time[s]'],['roll[rad]','pitch[rad]','yaw[rad]'],10000)
-        if rovioEvaluator.doCov:
-            plotterYpr.addDataToSubplotMultiple(td_rovio, 'yprSm', [1,2,3], ['r--','r--','r--'], ['','',''])
-            plotterYpr.addDataToSubplotMultiple(td_rovio, 'yprSp', [1,2,3], ['r--','r--','r--'], ['','',''])
-        yprIdsEst = td_rovio.getColIDs('ypr')
-        plotterYpr.addDataToSubplotMultiple(td_rovio, 'ypr', [1,2,3], ['r','r','r'], ['','',''])
-        plotterYpr.addDataToSubplotMultiple(td_vicon, 'ypr', [1,2,3], ['b','b','b'], ['','',''])
-
-    if draw_fig:
-        raw_input("Press Enter to continue...")
-# if plotRor: # Rotational rate plotting
-#     plotterRor = Plotter(-1, [3,1],'Rotational Rate',['','','time[s]'],['$\omega_x$[rad/s]','$\omega_y$[rad/s]','$\omega_z$[rad/s]'],10000)
-#     plotterRor.addDataToSubplotMultiple(td_rovio, 'ror', [1,2,3], ['r','r','r'], ['','',''])
-#     plotterRor.addDataToSubplotMultiple(td_vicon, 'ror', [1,2,3], ['b','b','b'], ['','',''])
+    td_rovio.computeRMS('pos', 'att', 'vel', td_vicon, 'pos', 'att', 'vel', 0.0)
 #
-# if plotRon: # Plotting rotational rate norm
-#     plotterRon = Plotter(-1, [1,1],'Norm of Rotational Rate',['time [s]'],['Rotational Rate Norm [rad/s]'],10000)
-#     plotterRon.addDataToSubplot(td_rovio, 'ron', 1, 'r', 'rovio rotational rate norm')
-#     plotterRon.addDataToSubplot(td_vicon, 'ron', 1, 'b', 'vicon rotational rate norm')
+#     if plotPos and draw_fig: # Position plotting
+#         plotterPos = Plotter(-1, [3,1],'Position',['','','time[s]'],['x[m]','y[m]','z[m]'],10000)
+#         if rovioEvaluator.doCov:
+#             plotterPos.addDataToSubplotMultiple(td_rovio, 'posSm', [1,2,3], ['r--','r--','r--'], ['','',''])
+#             plotterPos.addDataToSubplotMultiple(td_rovio, 'posSp', [1,2,3], ['r--','r--','r--'], ['','',''])
+#         plotterPos.addDataToSubplotMultiple(td_rovio, 'pos', [1,2,3], ['r','r','r'], ['','',''])
+#         plotterPos.addDataToSubplotMultiple(td_vicon, 'pos', [1,2,3], ['b','b','b'], ['','',''])
 #
-    # rovioEvaluator.doLeutiEvaluation()
-# rovioEvaluator.doFeatureDepthEvaluation()
+#     if plotVel and draw_fig: # Velocity plotting
+#         plotterVel = Plotter(-1, [3,1],'Robocentric Velocity',['','','time[s]'],['$v_x$[m/s]','$v_y$[m/s]','$v_z$[m/s]'],10000)
+#         plotterVel.addDataToSubplotMultiple(td_rovio, 'vel', [1,2,3], ['r','r','r'], ['','',''])
+#         plotterVel.addDataToSubplotMultiple(td_vicon, 'vel', [1,2,3], ['b','b','b'], ['','',''])
+#
+#     if plotAtt and draw_fig: # Attitude plotting
+#         plotterAtt = Plotter(-1, [4,1],'Attitude Quaternion',['','','','time[s]'],['w[1]','x[1]','y[1]','z[1]'],10000)
+#         plotterAtt.addDataToSubplotMultiple(td_rovio, 'att', [1,2,3,4], ['r','r','r','r'], ['','','',''])
+#         plotterAtt.addDataToSubplotMultiple(td_vicon, 'att', [1,2,3,4], ['b','b','b','b'], ['','','',''])
+#
+#     if plotYpr and draw_fig: # Yaw-pitch-roll plotting
+#         plotterYpr = Plotter(-1, [3,1],'Yaw-Pitch-Roll Decomposition',['','','time[s]'],['roll[rad]','pitch[rad]','yaw[rad]'],10000)
+#         if rovioEvaluator.doCov:
+#             plotterYpr.addDataToSubplotMultiple(td_rovio, 'yprSm', [1,2,3], ['r--','r--','r--'], ['','',''])
+#             plotterYpr.addDataToSubplotMultiple(td_rovio, 'yprSp', [1,2,3], ['r--','r--','r--'], ['','',''])
+#         yprIdsEst = td_rovio.getColIDs('ypr')
+#         plotterYpr.addDataToSubplotMultiple(td_rovio, 'ypr', [1,2,3], ['r','r','r'], ['','',''])
+#         plotterYpr.addDataToSubplotMultiple(td_vicon, 'ypr', [1,2,3], ['b','b','b'], ['','',''])
+#
+#     if draw_fig:
+#         raw_input("Press Enter to continue...")
+# # if plotRor: # Rotational rate plotting
+# #     plotterRor = Plotter(-1, [3,1],'Rotational Rate',['','','time[s]'],['$\omega_x$[rad/s]','$\omega_y$[rad/s]','$\omega_z$[rad/s]'],10000)
+# #     plotterRor.addDataToSubplotMultiple(td_rovio, 'ror', [1,2,3], ['r','r','r'], ['','',''])
+# #     plotterRor.addDataToSubplotMultiple(td_vicon, 'ror', [1,2,3], ['b','b','b'], ['','',''])
+# #
+# # if plotRon: # Plotting rotational rate norm
+# #     plotterRon = Plotter(-1, [1,1],'Norm of Rotational Rate',['time [s]'],['Rotational Rate Norm [rad/s]'],10000)
+# #     plotterRon.addDataToSubplot(td_rovio, 'ron', 1, 'r', 'rovio rotational rate norm')
+# #     plotterRon.addDataToSubplot(td_vicon, 'ron', 1, 'b', 'vicon rotational rate norm')
+# #
+#     # rovioEvaluator.doLeutiEvaluation()
+# # rovioEvaluator.doFeatureDepthEvaluation()
